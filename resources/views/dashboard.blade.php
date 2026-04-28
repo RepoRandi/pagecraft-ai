@@ -54,7 +54,7 @@
 
             <div class="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
 
-                <form id="generateForm" method="POST" action="{{ route('sales-pages.store') }}"
+                <form id="generateForm" method="POST" action="{{ secure_url(route('sales-pages.store', [], false)) }}"
                     class="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.03] p-6 shadow-2xl shadow-slate-950/50 backdrop-blur-xl">
                     @csrf
 
@@ -141,7 +141,7 @@
                             </div>
 
                             <button type="submit" id="generateBtn"
-                                class="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 py-4 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] hover:brightness-110">
+                                class="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 py-4 font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70">
                                 Generate Sales Page
                             </button>
                         </div>
@@ -160,7 +160,8 @@
                             </div>
                         </div>
 
-                        <form method="GET" action="{{ route('dashboard') }}" class="space-y-3">
+                        <form method="GET" action="{{ secure_url(route('dashboard', [], false)) }}"
+                            class="space-y-3">
                             <div class="grid gap-3 xl:grid-cols-[1fr_170px]">
                                 <div class="relative">
                                     <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
@@ -194,7 +195,7 @@
                                 </button>
 
                                 @if (request()->filled('search') || request()->filled('template'))
-                                    <a href="{{ route('dashboard') }}"
+                                    <a href="{{ secure_url(route('dashboard', [], false)) }}"
                                         class="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.08] hover:text-white sm:flex-none">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
@@ -230,17 +231,18 @@
                                 </div>
 
                                 <div class="mt-4 flex flex-wrap items-center gap-3">
-                                    <a href="{{ route('sales-pages.show', $page) }}"
+                                    <a href="{{ secure_url(route('sales-pages.show', $page, false)) }}"
                                         class="rounded-2xl bg-white px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-cyan-100">
                                         Preview
                                     </a>
 
-                                    <a href="{{ route('sales-pages.export', $page) }}"
+                                    <a href="{{ secure_url(route('sales-pages.export', $page, false)) }}"
                                         class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15">
                                         Export
                                     </a>
 
-                                    <form method="POST" action="{{ route('sales-pages.destroy', $page) }}">
+                                    <form method="POST"
+                                        action="{{ secure_url(route('sales-pages.destroy', $page, false)) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button
@@ -262,7 +264,7 @@
                                 </p>
 
                                 @if (request()->filled('search') || request()->filled('template'))
-                                    <a href="{{ route('dashboard') }}"
+                                    <a href="{{ secure_url(route('dashboard', [], false)) }}"
                                         class="mt-5 inline-flex rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.08] hover:text-white">
                                         Clear filters
                                     </a>
@@ -290,6 +292,7 @@
     <script>
         const sampleBtn = document.getElementById('sampleBtn');
         const generateForm = document.getElementById('generateForm');
+        const generateBtn = document.getElementById('generateBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
 
         sampleBtn?.addEventListener('click', () => {
@@ -305,6 +308,9 @@
         });
 
         generateForm?.addEventListener('submit', () => {
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
         });
