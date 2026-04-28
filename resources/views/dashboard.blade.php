@@ -242,12 +242,15 @@
                                     </a>
 
                                     <form method="POST"
-                                        action="{{ secure_url(route('sales-pages.destroy', $page, false)) }}">
+                                        action="{{ secure_url(route('sales-pages.destroy', $page, false)) }}"
+                                        class="deleteForm">
                                         @csrf
                                         @method('DELETE')
-                                        <button
-                                            class="rounded-2xl border border-red-400/20 px-4 py-2 text-sm font-bold text-red-300 transition hover:bg-red-500/10">
-                                            Delete
+                                        <button type="submit"
+                                            class="deleteBtn inline-flex items-center gap-2 rounded-2xl border border-red-400/20 px-4 py-2 text-sm font-bold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60">
+                                            <span
+                                                class="deleteSpinner hidden h-4 w-4 animate-spin rounded-full border-2 border-red-300/30 border-t-red-300"></span>
+                                            <span class="deleteText">Delete</span>
                                         </button>
                                     </form>
                                 </div>
@@ -313,6 +316,24 @@
 
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
+        });
+
+        document.querySelectorAll('.deleteForm').forEach((form) => {
+            form.addEventListener('submit', () => {
+                const button = form.querySelector('.deleteBtn');
+                const spinner = form.querySelector('.deleteSpinner');
+                const text = form.querySelector('.deleteText');
+
+                button.disabled = true;
+                spinner.classList.remove('hidden');
+                text.textContent = 'Deleting...';
+
+                loadingOverlay.querySelector('h3').textContent = 'Deleting sales page...';
+                loadingOverlay.querySelector('p').textContent =
+                    'Please wait while we remove this generated page.';
+                loadingOverlay.classList.remove('hidden');
+                loadingOverlay.classList.add('flex');
+            });
         });
     </script>
 </x-app-layout>
