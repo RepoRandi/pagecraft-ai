@@ -3,8 +3,15 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SalesPageController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
+
+    if (Auth::check()) {
+
+        return redirect()->route('dashboard');
+    }
+
     return redirect()->route('login');
 });
 
