@@ -84,7 +84,7 @@ Generated content is rendered as real landing page UI.
 # ⚙️ Installation & Setup
 
 ## Clone Repo
-git clone https://github.com/your-username/pagecraft-ai.git
+git clone https://github.com/RepoRandi/pagecraft-ai.git
 cd pagecraft-ai
 
 ## Install
