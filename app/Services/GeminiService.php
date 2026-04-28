@@ -15,16 +15,8 @@ class GeminiService
         $model = config('services.gemini.model', 'gemini-2.5-flash');
         $maxTokens = (int) config('services.gemini.max_output_tokens', 4096);
         $timeout = (int) config('services.gemini.timeout', 45);
-        $debug = filter_var(env('GEMINI_DEBUG', false), FILTER_VALIDATE_BOOLEAN);
 
         if (!$apiKey) {
-            if ($debug) {
-                dd([
-                    'source' => 'fallback_local',
-                    'reason' => 'GEMINI_API_KEY is empty',
-                ]);
-            }
-
             return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
         }
 
@@ -36,7 +28,7 @@ class GeminiService
             'price' => $data['price'] ?? '',
             'unique_selling_points' => $data['unique_selling_points'] ?? '',
             'model' => $model,
-            'prompt_version' => 'v2_compact_json',
+            'prompt_version' => 'v2_production',
         ]));
 
         return Cache::remember($cacheKey, now()->addDay(), function () use (
@@ -44,12 +36,9 @@ class GeminiService
             $model,
             $maxTokens,
             $timeout,
-            $data,
-            $debug
+            $data
         ) {
             try {
-                $prompt = $this->buildCompactPrompt($data);
-
                 $response = Http::timeout($timeout)
                     ->retry(2, 1200)
                     ->post(
@@ -58,7 +47,7 @@ class GeminiService
                             'contents' => [
                                 [
                                     'parts' => [
-                                        ['text' => $prompt],
+                                        ['text' => $this->buildCompactPrompt($data)],
                                     ],
                                 ],
                             ],
@@ -72,16 +61,6 @@ class GeminiService
                     );
 
                 if ($response->failed()) {
-                    if ($debug) {
-                        dd([
-                            'source' => 'gemini_failed',
-                            'status' => $response->status(),
-                            'body' => $response->json(),
-                            'raw_body' => $response->body(),
-                            'model' => $model,
-                        ]);
-                    }
-
                     Log::warning('Gemini API failed. Using fallback.', [
                         'status' => $response->status(),
                         'body' => $response->body(),
@@ -94,39 +73,13 @@ class GeminiService
                 $text = $response->json('candidates.0.content.parts.0.text');
 
                 if (!$text) {
-                    if ($debug) {
-                        dd([
-                            'source' => 'gemini_empty_response',
-                            'response' => $response->json(),
-                            'model' => $model,
-                        ]);
-                    }
-
                     return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
                 }
 
                 $result = $this->parseJsonResponse($text, $data);
-                $result = $this->withSource($result, 'gemini_ai');
 
-                if ($debug) {
-                    dd([
-                        'source' => 'gemini_ai',
-                        'model' => $model,
-                        'raw_text' => $text,
-                        'result' => $result,
-                    ]);
-                }
-
-                return $result;
+                return $this->withSource($result, 'gemini_ai');
             } catch (\Throwable $e) {
-                if ($debug) {
-                    dd([
-                        'source' => 'gemini_exception',
-                        'message' => $e->getMessage(),
-                        'model' => $model,
-                    ]);
-                }
-
                 Log::warning('Gemini exception. Using fallback.', [
                     'message' => $e->getMessage(),
                     'model' => $model,
