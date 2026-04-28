@@ -31,7 +31,7 @@
                 </p>
             </div>
 
-            <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
+            <form method="post" action="{{ secure_url(route('profile.destroy', [], false)) }}" class="p-6">
                 @csrf
                 @method('delete')
 

@@ -3,23 +3,18 @@
         $content = $salesPage->generated_content;
 
         $score = 0;
-
         if (strlen($content['headline'] ?? '') > 20) {
             $score += 20;
         }
-
         if (!empty($content['benefits'])) {
             $score += 20;
         }
-
         if (!empty($content['features'])) {
             $score += 20;
         }
-
         if (!empty($content['cta']['button'] ?? null)) {
             $score += 20;
         }
-
         if (!empty($content['pricing']['price'] ?? null)) {
             $score += 20;
         }
@@ -88,7 +83,7 @@
 
             <div class="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
                 <div>
-                    <a href="{{ route('dashboard') }}"
+                    <a href="{{ secure_url(route('dashboard', [], false)) }}"
                         class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-300/30 hover:bg-white/[0.07] hover:text-white">
                         ← Back to dashboard
                     </a>
@@ -120,43 +115,46 @@
                         Copy Full Copy
                     </button>
 
-                    <form method="POST" action="{{ route('sales-pages.regenerate-section', $salesPage) }}">
+                    <form method="POST"
+                        action="{{ secure_url(route('sales-pages.regenerate-section', $salesPage, false)) }}"
+                        class="regenerateForm">
                         @csrf
                         @method('PATCH')
-
                         <input type="hidden" name="section" value="headline">
 
                         <button type="submit"
-                            class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15">
+                            class="regenerateBtn rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60">
                             Regenerate Headline
                         </button>
                     </form>
 
-                    <form method="POST" action="{{ route('sales-pages.regenerate-section', $salesPage) }}">
+                    <form method="POST"
+                        action="{{ secure_url(route('sales-pages.regenerate-section', $salesPage, false)) }}"
+                        class="regenerateForm">
                         @csrf
                         @method('PATCH')
-
                         <input type="hidden" name="section" value="cta">
 
                         <button type="submit"
-                            class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15">
+                            class="regenerateBtn rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60">
                             Regenerate CTA
                         </button>
                     </form>
 
-                    <form method="POST" action="{{ route('sales-pages.regenerate-section', $salesPage) }}">
+                    <form method="POST"
+                        action="{{ secure_url(route('sales-pages.regenerate-section', $salesPage, false)) }}"
+                        class="regenerateForm">
                         @csrf
                         @method('PATCH')
-
                         <input type="hidden" name="section" value="benefits">
 
                         <button type="submit"
-                            class="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15">
+                            class="regenerateBtn rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60">
                             Regenerate Benefits
                         </button>
                     </form>
 
-                    <a href="{{ route('sales-pages.export', $salesPage) }}"
+                    <a href="{{ secure_url(route('sales-pages.export', $salesPage, false)) }}"
                         class="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] hover:brightness-110">
                         Export HTML
                     </a>
@@ -305,6 +303,20 @@
                 class="fixed bottom-6 left-1/2 z-[999] hidden -translate-x-1/2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-200 shadow-2xl backdrop-blur">
                 Copied to clipboard
             </div>
+
+            <div id="loadingOverlay"
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
+                <div
+                    class="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-8 text-center shadow-2xl">
+                    <div
+                        class="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300">
+                    </div>
+                    <h3 id="loadingTitle" class="mt-6 text-xl font-black">Processing...</h3>
+                    <p id="loadingText" class="mt-2 text-sm text-slate-400">
+                        Please wait while we update your sales page.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -319,5 +331,23 @@
                 }, 1600);
             });
         }
+
+        document.querySelectorAll('.regenerateForm').forEach((form) => {
+            form.addEventListener('submit', () => {
+                const button = form.querySelector('.regenerateBtn');
+                const section = form.querySelector('input[name="section"]')?.value || 'section';
+
+                button.disabled = true;
+                button.textContent = 'Regenerating...';
+
+                document.getElementById('loadingTitle').textContent = `Regenerating ${section}...`;
+                document.getElementById('loadingText').textContent =
+                    'AI is rewriting this section with a fresh marketing angle.';
+
+                const overlay = document.getElementById('loadingOverlay');
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            });
+        });
     </script>
 </x-app-layout>

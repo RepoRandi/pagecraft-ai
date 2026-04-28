@@ -1,5 +1,5 @@
 <section>
-    <form method="post" action="{{ route('password.update') }}" class="space-y-6">
+    <form method="post" action="{{ secure_url(route('password.update', [], false)) }}" class="space-y-6">
         @csrf
         @method('put')
 
