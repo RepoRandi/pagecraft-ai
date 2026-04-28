@@ -1,146 +1,249 @@
-# 🚀 PageCraft AI - AI Sales Page Generator
+# 🚀 PageCraft AI — AI Sales Page Generator
 
-PageCraft AI is a Laravel-based web application that transforms raw product or service information into a structured, persuasive, and export-ready sales page.
+PageCraft AI is a full-stack Laravel web application that transforms raw product or service input into a structured, persuasive, and export-ready sales page.
 
-This project was built for the **PT Dakwah Digital Network technical task (Option B: AI Sales Page Generator)**.
+This project was built for the PT Dakwah Digital Network Technical Task (Option B: AI Sales Page Generator) and focuses on AI integration, system reliability, and production-minded design.
+
+---
+
+# 🌍 Live Demo
+👉 https://pagecraft-ai-production-d910.up.railway.app
 
 ---
 
 # ✨ Features
 
 ## 🔐 Authentication
-- Register
-- Login
-- Logout
+- Register / Login / Logout
 - Profile management
+- Secure session handling
+
+---
 
 ## 📝 Product Input Form
 Users can input:
-- Product or service name
+- Product / Service Name
 - Description
-- Key features
-- Target audience
+- Key Features
+- Target Audience
 - Price
-- Unique selling points
-- Design template
+- Unique Selling Points
+- Design Template
 
 ---
 
 ## 🤖 AI Sales Page Generation
-The system generates structured landing page content:
+Generates structured landing page content:
 - Headline
 - Subheadline
 - Description
 - Benefits
 - Features
-- Social proof
+- Social Proof
 - Pricing
-- CTA
+- CTA (Call To Action)
 
 ---
 
-## 🧠 Fallback Generator
-If the AI API fails, the system uses a local fallback generator.
+## 🧠 Hybrid AI System (Core Strength)
+
+This system uses a dual-layer generation approach:
+
+### 1. Primary: Gemini API (LLM)
+- High-quality structured generation
+- JSON-based response format
+
+### 2. Fallback Generator (Local)
+- Activated if API fails
+- Ensures system reliability
+- Guarantees output even without AI
 
 ---
 
 ## 📚 Saved Pages
-- View history
-- Search
-- Filter by template
-- Delete
+- Persistent storage (SQLite)
+- Search & filter
+- Delete functionality
 
 ---
 
 ## 👀 Live Preview
-Generated content is rendered as real landing page UI.
+- Fully rendered landing page UI
+- Based on selected template
+- Real-time content visualization
 
 ---
 
 ## 📦 Export HTML
-- Standalone HTML
+- Standalone HTML file
 - Fully styled
+- Ready for deployment
 
 ---
 
 ## 🔥 Bonus Features
-- Multiple templates (Dark, Minimal, Glass)
-- Copy Headline / CTA / Full Copy
-- Conversion Score
-- Regenerate Sections
+- Multiple templates:
+  - Dark Luxury
+  - Minimal Clean
+  - Glassmorphism
+- Copy:
+  - Headline
+  - CTA
+  - Full Copy
+- Conversion Score system
+- Regenerate section (headline / CTA / benefits)
+- Loading states for UX improvement
 
 ---
 
-# 🛠 Tech Stack
+# 🧠 AI Strategy
+
+To ensure cost efficiency, reliability, and performance, the system implements:
+
+- Structured prompts (JSON-only output)
+- Token minimization
+- Fallback system for API failure
+- Rate limiting (per user)
+- Controlled AI usage (avoid unnecessary calls)
+
+### Goals:
+- Stable output
+- Predictable cost
+- Production-ready behavior
+
+---
+
+# 🏗 Architecture
+
+Controller    ↓ Service Layer (GeminiService)    ↓ AI / Fallback Generator    ↓ Database (SQLite)    ↓ Blade UI (Preview / Dashboard)
+
+### Components:
+- Controller → Request handling
+- Service Layer → AI logic abstraction
+- Fallback Generator → Reliability layer
+- Views → UI rendering
+
+---
+
+# 🔐 Security & Reliability
+
+- HTTPS enforced in production
+- CSRF protection enabled
+- Input validation (Laravel)
+- Rate limiting (AI requests)
+- Fallback mechanism (AI failure safe)
+- Secure authentication (Laravel Breeze)
+
+---
+
+# ⚙️ Tech Stack
+
 - Laravel 13
-- Breeze (Blade)
+- Blade (Laravel Breeze)
 - Tailwind CSS
 - Vite
-- Gemini API (optional)
 - SQLite
+- Gemini API (optional)
 
 ---
 
 # ⚙️ Installation & Setup
 
-## Clone Repo
-git clone https://github.com/RepoRandi/pagecraft-ai.git
-cd pagecraft-ai
+## 1. Clone Repository
+bash git clone https://github.com/RepoRandi/pagecraft-ai.git cd pagecraft-ai 
 
-## Install
-composer install
-npm install
+## 2. Install Dependencies
+bash composer install npm install 
 
-## Env
-cp .env.example .env
-php artisan key:generate
+## 3. Setup Environment
+bash cp .env.example .env php artisan key:generate 
 
-## Database
-touch database/database.sqlite
+## 4. Setup Database
+bash touch database/database.sqlite 
 
-Update .env:
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+Edit .env:
+DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite
 
-## Migrate
-php artisan migrate
+## 5. Run Migration
+bash php artisan migrate 
 
-## Run
-php artisan serve
-npm run dev
+## 6. Run App
+bash php artisan serve npm run dev 
 
 Open:
 http://127.0.0.1:8000
 
 ---
 
-# 🚀 Quick Test
+# 🚀 Quick Test Flow
+
 1. Register
 2. Login
-3. Use Example
-4. Generate Page
+3. Click Use Example
+4. Click Generate Sales Page
 5. Preview / Export / Copy / Regenerate
 
 ---
 
 # 👤 Dummy Account
+
 Email: reviewer@demo.com  
-Password: password123
+Password: password123  
 
 ---
 
-# 🧠 Flow
-Input → AI/Fallback → Save → Preview → Export
+# 🧪 Example Flow
+
+User Input    ↓ AI Generation (Gemini)    ↓ Fallback (if failed)    ↓ Save to DB    ↓ Render Preview    ↓ Export HTML
 
 ---
 
-# 🎨 UI
-Modern SaaS design with:
-- Dark theme
-- Glass effects
+# 🎨 UI/UX Design
+
+- Modern SaaS interface
+- Dark mode optimized
+- Glassmorphism effects
 - Responsive layout
+- Loading overlays for async actions
+
+---
+
+# ⚠️ Limitations
+
+- AI output depends on external API (Gemini)
+- No media/image generation yet
+- No collaborative editing
+- No versioning for generated pages
+
+---
+
+# 🚀 Future Improvements
+
+- Multi-language support
+- AI fine-tuning for niche industries
+- A/B testing for conversion optimization
+- Image generation integration
+- Team collaboration workspace
+- Analytics dashboard
 
 ---
 
 # 🏁 Conclusion
-This project demonstrates full-stack Laravel + AI + UI/UX + product thinking.
+
+This project demonstrates:
+
+- Full-stack Laravel development
+- AI integration with fallback strategy
+- Clean architecture principles
+- Modern UI/UX implementation
+- Production-aware design (cost, reliability, performance)
+
+> This system is designed not only to meet feature requirements,
+> but also to reflect real-world engineering considerations such as scalability, reliability, and cost efficiency.
+
+---
+
+# 👨‍💻 Author
+
+Randi Maulana Akbar
+Senior Software Engineer
