@@ -62,7 +62,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('register') }}" class="mt-6 space-y-5">
+                    <form method="POST" action="{{ secure_url(route('register', [], false)) }}">
                         @csrf
 
                         <div>
