@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - PageCraft AI</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -62,7 +63,8 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ secure_url(route('login', [], false)) }}" class="mt-6 space-y-5">
+                    <form id="loginForm" method="POST" action="{{ secure_url(route('login', [], false)) }}"
+                        class="mt-6 space-y-5">
                         @csrf
 
                         <div>
@@ -79,23 +81,54 @@
                                 placeholder="••••••••">
                         </div>
 
-                        <button type="submit"
-                            class="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-5 py-3.5 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01]">
-                            Login
+                        <button id="loginButton" type="submit"
+                            class="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-5 py-3.5 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70">
+                            <span id="loginSpinner"
+                                class="hidden h-5 w-5 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950"></span>
+                            <span id="loginText">Login</span>
                         </button>
                     </form>
 
                     <p class="mt-6 text-center text-sm text-slate-400">
                         Don’t have an account?
-                        <a href="{{ route('register') }}" class="font-semibold text-cyan-300 hover:text-cyan-200">
+                        <a href="{{ secure_url(route('register', [], false)) }}"
+                            class="font-semibold text-cyan-300 hover:text-cyan-200">
                             Register
                         </a>
                     </p>
                 </div>
             </div>
         </section>
-
     </main>
+
+    <div id="loadingOverlay"
+        class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
+        <div class="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-8 text-center shadow-2xl">
+            <div class="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300">
+            </div>
+            <h3 class="mt-6 text-xl font-black">Signing you in...</h3>
+            <p class="mt-2 text-sm text-slate-400">
+                Please wait while we prepare your workspace.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginButton = document.getElementById('loginButton');
+        const loginSpinner = document.getElementById('loginSpinner');
+        const loginText = document.getElementById('loginText');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        loginForm?.addEventListener('submit', () => {
+            loginButton.disabled = true;
+            loginSpinner.classList.remove('hidden');
+            loginText.textContent = 'Logging in...';
+
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+        });
+    </script>
 </body>
 
 </html>
