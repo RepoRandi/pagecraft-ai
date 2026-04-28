@@ -5,265 +5,430 @@ namespace App\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class GeminiService
 {
+    private string $apiKey;
+    private string $model;
+    private int $maxOutputTokens;
+    private int $timeout;
+    private bool $debug;
+
+    public function __construct()
+    {
+        $this->apiKey = (string) config('services.gemini.api_key');
+        $this->model = (string) config('services.gemini.model', 'gemini-2.5-flash');
+        $this->maxOutputTokens = (int) config('services.gemini.max_output_tokens', 1800);
+        $this->timeout = (int) config('services.gemini.timeout', 30);
+        $this->debug = (bool) config('services.gemini.debug', false);
+    }
+
     public function generateSalesPage(array $data): array
     {
-        $apiKey = config('services.gemini.api_key');
-        $model = config('services.gemini.model', 'gemini-2.5-flash');
-        $maxTokens = (int) config('services.gemini.max_output_tokens', 4096);
-        $timeout = (int) config('services.gemini.timeout', 45);
+        $cacheKey = 'gemini_sales_page_' . md5(json_encode($data));
 
-        if (!$apiKey) {
-            return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
-        }
-
-        $cacheKey = 'sales_page_ai_' . md5(json_encode([
-            'product_name' => $data['product_name'] ?? '',
-            'description' => $data['description'] ?? '',
-            'features' => $data['features'] ?? '',
-            'target_audience' => $data['target_audience'] ?? '',
-            'price' => $data['price'] ?? '',
-            'unique_selling_points' => $data['unique_selling_points'] ?? '',
-            'model' => $model,
-            'prompt_version' => 'v2_production',
-        ]));
-
-        return Cache::remember($cacheKey, now()->addDay(), function () use (
-            $apiKey,
-            $model,
-            $maxTokens,
-            $timeout,
-            $data
-        ) {
-            try {
-                $response = Http::timeout($timeout)
-                    ->retry(2, 1200)
-                    ->post(
-                        "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}",
-                        [
-                            'contents' => [
-                                [
-                                    'parts' => [
-                                        ['text' => $this->buildCompactPrompt($data)],
-                                    ],
-                                ],
-                            ],
-                            'generationConfig' => [
-                                'temperature' => 0.65,
-                                'topP' => 0.9,
-                                'maxOutputTokens' => $maxTokens,
-                                'responseMimeType' => 'application/json',
-                            ],
-                        ]
-                    );
-
-                if ($response->failed()) {
-                    Log::warning('Gemini API failed. Using fallback.', [
-                        'status' => $response->status(),
-                        'body' => $response->body(),
-                        'model' => $model,
-                    ]);
-
-                    return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
-                }
-
-                $text = $response->json('candidates.0.content.parts.0.text');
-
-                if (!$text) {
-                    return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
-                }
-
-                $result = $this->parseJsonResponse($text, $data);
-
-                return $this->withSource($result, 'gemini_ai');
-            } catch (\Throwable $e) {
-                Log::warning('Gemini exception. Using fallback.', [
-                    'message' => $e->getMessage(),
-                    'model' => $model,
-                ]);
-
-                return $this->withSource($this->fallbackSalesPage($data), 'fallback_local');
-            }
+        return Cache::remember($cacheKey, now()->addDays(7), function () use ($data) {
+            return $this->callGemini($data);
         });
     }
 
-    private function buildCompactPrompt(array $data): string
+    public function regenerateSection(array $currentContent, array $salesPageData, string $section): array
     {
+        $allowedSections = ['headline', 'cta', 'benefits'];
+
+        if (!in_array($section, $allowedSections, true)) {
+            return $currentContent;
+        }
+
+        try {
+            $prompt = $this->buildRegeneratePrompt($currentContent, $salesPageData, $section);
+
+            $result = $this->requestGemini($prompt);
+
+            if (!$result) {
+                return $currentContent;
+            }
+
+            if ($section === 'headline' && !empty($result['headline'])) {
+                $currentContent['headline'] = $result['headline'];
+                $currentContent['subheadline'] = $result['subheadline'] ?? ($currentContent['subheadline'] ?? '');
+            }
+
+            if ($section === 'cta' && !empty($result['cta'])) {
+                $currentContent['cta'] = $result['cta'];
+            }
+
+            if ($section === 'benefits' && !empty($result['benefits'])) {
+                $currentContent['benefits'] = $result['benefits'];
+            }
+
+            $currentContent['_source'] = 'gemini_ai_regenerated';
+
+            return $this->normalizeContent($currentContent, $salesPageData);
+        } catch (\Throwable $e) {
+            Log::warning('Gemini regenerate failed', [
+                'section' => $section,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $currentContent;
+        }
+    }
+
+    private function callGemini(array $data): array
+    {
+        if (empty($this->apiKey)) {
+            Log::warning('Gemini API key is empty. Using fallback content.');
+
+            return $this->fallbackContent($data, 'fallback_no_api_key');
+        }
+
+        try {
+            $prompt = $this->buildPrompt($data);
+
+            $result = $this->requestGemini($prompt);
+
+            if (!$result) {
+                return $this->fallbackContent($data, 'fallback_invalid_response');
+            }
+
+            $result['_source'] = 'gemini_ai';
+
+            return $this->normalizeContent($result, $data);
+        } catch (\Throwable $e) {
+            Log::error('Gemini API failed', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return $this->fallbackContent($data, 'fallback_exception');
+        }
+    }
+
+    private function requestGemini(string $prompt): ?array
+    {
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
+
+        $response = Http::timeout($this->timeout)
+            ->retry(1, 500)
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+            ])
+            ->post($url . '?key=' . $this->apiKey, [
+                'contents' => [
+                    [
+                        'role' => 'user',
+                        'parts' => [
+                            [
+                                'text' => $prompt,
+                            ],
+                        ],
+                    ],
+                ],
+                'generationConfig' => [
+                    'temperature' => 0.7,
+                    'topP' => 0.9,
+                    'maxOutputTokens' => $this->maxOutputTokens,
+                    'responseMimeType' => 'application/json',
+                ],
+            ]);
+
+        if (!$response->successful()) {
+            Log::warning('Gemini API response failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        $text = $response->json('candidates.0.content.parts.0.text');
+
+        if (!$text) {
+            Log::warning('Gemini empty text response', [
+                'response' => $response->json(),
+            ]);
+
+            return null;
+        }
+
+        $cleanJson = $this->extractJson($text);
+        $decoded = json_decode($cleanJson, true);
+
+        if (!is_array($decoded)) {
+            Log::warning('Gemini invalid JSON', [
+                'raw_text' => $text,
+                'json_error' => json_last_error_msg(),
+            ]);
+
+            return null;
+        }
+
+        if ($this->debug) {
+            Log::info('Gemini success', [
+                'model' => $this->model,
+                'result_keys' => array_keys($decoded),
+            ]);
+        }
+
+        return $decoded;
+    }
+
+    private function buildPrompt(array $data): string
+    {
+        $productName = $data['product_name'] ?? '';
+        $description = $data['description'] ?? '';
+        $features = $data['features'] ?? '';
+        $targetAudience = $data['target_audience'] ?? '';
+        $price = $data['price'] ?? '';
+        $uniqueSellingPoints = $data['unique_selling_points'] ?? '';
+
         return <<<PROMPT
-Generate a concise high-converting sales page as valid JSON only.
+Generate a concise, persuasive AI sales page in valid JSON only.
 
-Product: {$data['product_name']}
-Description: {$data['description']}
-Features: {$data['features']}
-Audience: {$data['target_audience']}
-Price: {$data['price']}
-USP: {$data['unique_selling_points']}
+Product: {$productName}
+Description: {$description}
+Features: {$features}
+Target audience: {$targetAudience}
+Price: {$price}
+Unique selling points: {$uniqueSellingPoints}
 
-Rules:
-- Return JSON only.
-- Do not use markdown.
-- Keep every string concise, maximum 18 words.
-- Return exactly 3 benefits.
-- Return maximum 4 features.
-- Make copy specific to the product and audience.
-- Avoid generic words like "growth", "better results", or "complexity" unless necessary.
-- CTA must be short and action-oriented.
-
-Required JSON schema:
+Return only this JSON structure:
 {
-  "headline": "string",
-  "subheadline": "string",
-  "description": "string",
+  "headline": "",
+  "subheadline": "",
+  "description": "",
   "benefits": [
-    {"title": "string", "description": "string"},
-    {"title": "string", "description": "string"},
-    {"title": "string", "description": "string"}
+    {"title": "", "description": ""},
+    {"title": "", "description": ""},
+    {"title": "", "description": ""}
   ],
   "features": [
-    {"title": "string", "description": "string"}
+    {"title": "", "description": ""},
+    {"title": "", "description": ""},
+    {"title": "", "description": ""}
   ],
   "social_proof": {
-    "title": "string",
-    "description": "string"
+    "title": "",
+    "description": ""
   },
   "pricing": {
-    "label": "string",
-    "price": "string",
-    "description": "string"
+    "label": "",
+    "price": "",
+    "description": ""
   },
   "cta": {
-    "text": "string",
-    "button": "string"
+    "text": "",
+    "button": ""
   }
 }
+
+Rules:
+- JSON only.
+- No markdown.
+- No explanation.
+- Keep copy short, clear, and conversion-focused.
+- Make the headline specific to the product and target audience.
+- Benefits must explain real value, not generic filler.
+- Features must be based on the provided features.
+- CTA button must be short and action-oriented.
 PROMPT;
     }
 
-    private function parseJsonResponse(string $text, array $data): array
+    private function buildRegeneratePrompt(array $currentContent, array $salesPageData, string $section): string
     {
-        $cleanText = trim($text);
-        $cleanText = preg_replace('/^```json\s*/', '', $cleanText);
-        $cleanText = preg_replace('/^```\s*/', '', $cleanText);
-        $cleanText = preg_replace('/\s*```$/', '', $cleanText);
+        $productName = $salesPageData['product_name'] ?? '';
+        $description = $salesPageData['description'] ?? '';
+        $features = $salesPageData['features'] ?? '';
+        $targetAudience = $salesPageData['target_audience'] ?? '';
+        $price = $salesPageData['price'] ?? '';
+        $uniqueSellingPoints = $salesPageData['unique_selling_points'] ?? '';
+        $currentJson = json_encode($currentContent, JSON_PRETTY_PRINT);
 
-        $json = json_decode($cleanText, true);
+        return <<<PROMPT
+Regenerate only the "{$section}" section for this sales page.
 
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($json)) {
-            Log::warning('Invalid Gemini JSON. Using fallback.', [
-                'raw' => $text,
-                'error' => json_last_error_msg(),
-            ]);
+Product: {$productName}
+Description: {$description}
+Features: {$features}
+Target audience: {$targetAudience}
+Price: {$price}
+Unique selling points: {$uniqueSellingPoints}
 
-            return $this->fallbackSalesPage($data);
+Current content:
+{$currentJson}
+
+Return valid JSON only.
+
+If section is headline, return:
+{
+  "headline": "",
+  "subheadline": ""
+}
+
+If section is cta, return:
+{
+  "cta": {
+    "text": "",
+    "button": ""
+  }
+}
+
+If section is benefits, return:
+{
+  "benefits": [
+    {"title": "", "description": ""},
+    {"title": "", "description": ""},
+    {"title": "", "description": ""}
+  ]
+}
+
+Rules:
+- JSON only.
+- No markdown.
+- No explanation.
+- Make it more persuasive and specific.
+PROMPT;
+    }
+
+    private function extractJson(string $text): string
+    {
+        $text = trim($text);
+
+        $text = preg_replace('/^```json\s*/', '', $text);
+        $text = preg_replace('/^```\s*/', '', $text);
+        $text = preg_replace('/\s*```$/', '', $text);
+
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+
+        if ($start !== false && $end !== false && $end > $start) {
+            return substr($text, $start, $end - $start + 1);
         }
 
-        return $this->normalizeSalesPage($json, $data);
+        return $text;
     }
 
-    private function normalizeSalesPage(array $json, array $data): array
+    private function normalizeContent(array $content, array $data): array
     {
-        $fallback = $this->fallbackSalesPage($data);
+        $content['headline'] = $content['headline']
+            ?? 'Launch ' . ($data['product_name'] ?? 'Your Product') . ' With Clearer Messaging';
 
-        $features = $json['features'] ?? $fallback['features'];
-        $benefits = $json['benefits'] ?? $fallback['benefits'];
+        $content['subheadline'] = $content['subheadline']
+            ?? 'A focused sales page for ' . ($data['target_audience'] ?? 'your target audience') . '.';
 
-        return [
-            'headline' => $this->safeString($json['headline'] ?? $fallback['headline']),
-            'subheadline' => $this->safeString($json['subheadline'] ?? $fallback['subheadline']),
-            'description' => $this->safeString($json['description'] ?? $fallback['description']),
-            'benefits' => collect($benefits)
-                ->take(3)
-                ->map(fn($item) => [
-                    'title' => $this->safeString($item['title'] ?? 'Key Benefit'),
-                    'description' => $this->safeString($item['description'] ?? 'A clear benefit for the target audience.'),
-                ])
-                ->values()
-                ->toArray(),
-            'features' => collect($features)
-                ->take(4)
-                ->map(fn($item) => [
-                    'title' => $this->safeString($item['title'] ?? 'Feature'),
-                    'description' => $this->safeString($item['description'] ?? 'A useful feature for the product.'),
-                ])
-                ->values()
-                ->toArray(),
-            'social_proof' => [
-                'title' => $this->safeString($json['social_proof']['title'] ?? $fallback['social_proof']['title']),
-                'description' => $this->safeString($json['social_proof']['description'] ?? $fallback['social_proof']['description']),
+        $content['description'] = $content['description']
+            ?? ($data['description'] ?? '');
+
+        $content['benefits'] = $this->normalizeList($content['benefits'] ?? [], [
+            [
+                'title' => 'Clearer Product Positioning',
+                'description' => 'Turn product details into simple, persuasive messaging.',
             ],
-            'pricing' => [
-                'label' => $this->safeString($json['pricing']['label'] ?? 'Simple Pricing'),
-                'price' => $this->safeString($json['pricing']['price'] ?? $data['price']),
-                'description' => $this->safeString($json['pricing']['description'] ?? 'Start today with a clear plan.'),
+            [
+                'title' => 'Faster Landing Page Creation',
+                'description' => 'Generate a structured page without writing from scratch.',
             ],
-            'cta' => [
-                'text' => $this->safeString($json['cta']['text'] ?? 'Ready to get started?'),
-                'button' => $this->safeString($json['cta']['button'] ?? 'Get Started'),
+            [
+                'title' => 'Audience-Focused Copy',
+                'description' => 'Highlight value based on your target audience.',
             ],
+        ]);
+
+        $content['features'] = $this->normalizeList($content['features'] ?? [], $this->fallbackFeatures($data));
+
+        $content['social_proof'] = $content['social_proof'] ?? [
+            'title' => 'Designed for Practical Product Teams',
+            'description' => 'Built to support faster copywriting and landing page creation.',
         ];
+
+        $content['pricing'] = $content['pricing'] ?? [
+            'label' => 'Simple Pricing',
+            'price' => $data['price'] ?? '',
+            'description' => 'Start with a clear and transparent plan.',
+        ];
+
+        $content['cta'] = $content['cta'] ?? [
+            'text' => 'Ready to turn your product into a polished offer?',
+            'button' => 'Create My Page',
+        ];
+
+        return $content;
     }
 
-    private function fallbackSalesPage(array $data): array
+    private function normalizeList(array $items, array $fallback): array
     {
-        return [
-            'headline' => 'Launch ' . $data['product_name'] . ' With Clearer Messaging',
-            'subheadline' => 'A focused sales page for ' . $data['target_audience'] . '.',
-            'description' => $data['description'],
+        $normalized = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'title' => $item['title'] ?? '',
+                'description' => $item['description'] ?? '',
+            ];
+        }
+
+        return !empty($normalized) ? $normalized : $fallback;
+    }
+
+    private function fallbackContent(array $data, string $source = 'fallback'): array
+    {
+        return $this->normalizeContent([
+            'headline' => 'Launch ' . ($data['product_name'] ?? 'Your Product') . ' With Clearer Messaging',
+            'subheadline' => 'A focused sales page for ' . ($data['target_audience'] ?? 'your audience') . '.',
+            'description' => $data['description'] ?? '',
             'benefits' => [
                 [
                     'title' => 'Clearer Product Positioning',
-                    'description' => 'Turn product details into simple, persuasive messaging.',
+                    'description' => 'Turn raw product information into simple and persuasive sales messaging.',
                 ],
                 [
                     'title' => 'Faster Landing Page Creation',
-                    'description' => 'Generate a structured page without writing from scratch.',
+                    'description' => 'Create a complete landing page structure without starting from a blank page.',
                 ],
                 [
                     'title' => 'Audience-Focused Copy',
-                    'description' => 'Highlight value based on your target audience.',
+                    'description' => 'Highlight your product value based on what your target audience actually needs.',
                 ],
             ],
-            'features' => collect(explode(',', $data['features']))
-                ->filter()
-                ->take(4)
-                ->map(fn($feature) => [
-                    'title' => Str::headline(trim($feature)),
-                    'description' => 'Helps users get more value from ' . $data['product_name'] . '.',
-                ])
-                ->values()
-                ->toArray(),
+            'features' => $this->fallbackFeatures($data),
             'social_proof' => [
                 'title' => 'Designed for Practical Product Teams',
-                'description' => 'Built to support faster copywriting and landing page creation.',
+                'description' => 'Built to support faster copywriting, product positioning, and landing page creation.',
             ],
             'pricing' => [
                 'label' => 'Simple Pricing',
-                'price' => $data['price'],
+                'price' => $data['price'] ?? '',
                 'description' => 'Start with a clear and transparent plan.',
             ],
             'cta' => [
                 'text' => 'Ready to turn your product into a polished offer?',
                 'button' => 'Create My Page',
             ],
-        ];
+            '_source' => $source,
+        ], $data);
     }
 
-    private function safeString(mixed $value): string
+    private function fallbackFeatures(array $data): array
     {
-        if (!is_string($value)) {
-            return '';
+        $rawFeatures = $data['features'] ?? '';
+        $features = array_filter(array_map('trim', explode(',', $rawFeatures)));
+
+        if (empty($features)) {
+            $features = [
+                'Product Overview',
+                'Benefit Highlights',
+                'Clear Call To Action',
+            ];
         }
 
-        return trim($value);
-    }
-
-    private function withSource(array $data, string $source): array
-    {
-        $data['_source'] = $source;
-
-        return $data;
+        return array_map(function ($feature) use ($data) {
+            return [
+                'title' => ucwords($feature),
+                'description' => 'Helps users get more value from ' . ($data['product_name'] ?? 'this product') . '.',
+            ];
+        }, array_slice($features, 0, 5));
     }
 }

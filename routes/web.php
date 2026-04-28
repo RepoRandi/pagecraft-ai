@@ -2,35 +2,46 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SalesPageController;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-
-    if (Auth::check()) {
-
-        return redirect()->route('dashboard');
-    }
-
-    return redirect()->route('login');
+    return Auth::check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', [SalesPageController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [SalesPageController::class, 'index'])
+        ->name('dashboard');
 
-    Route::post('/sales-pages', [SalesPageController::class, 'store'])->name('sales-pages.store');
-    Route::get('/sales-pages/{salesPage}', [SalesPageController::class, 'show'])->name('sales-pages.show');
-    Route::delete('/sales-pages/{salesPage}', [SalesPageController::class, 'destroy'])->name('sales-pages.destroy');
-    Route::get('/sales-pages/{salesPage}/export', [SalesPageController::class, 'exportHtml'])->name('sales-pages.export');
+    Route::post('/sales-pages', [SalesPageController::class, 'store'])
+        ->middleware('throttle:10,1440')
+        ->name('sales-pages.store');
+
+    Route::get('/sales-pages/{salesPage}', [SalesPageController::class, 'show'])
+        ->name('sales-pages.show');
+
+    Route::delete('/sales-pages/{salesPage}', [SalesPageController::class, 'destroy'])
+        ->name('sales-pages.destroy');
+
+    Route::get('/sales-pages/{salesPage}/export', [SalesPageController::class, 'exportHtml'])
+        ->name('sales-pages.export');
 
     Route::patch('/sales-pages/{salesPage}/regenerate-section', [SalesPageController::class, 'regenerateSection'])
+        ->middleware('throttle:10,1440')
         ->name('sales-pages.regenerate-section');
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
 });
 
 require __DIR__ . '/auth.php';
