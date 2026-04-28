@@ -245,5 +245,32 @@ This project demonstrates:
 
 # 👨‍💻 Author
 
-Randi Maulana Akbar
-Senior Software Engineer
+**Randi Maulana Akbar**  
+
+Senior Software Engineer (Mobile & Fullstack)
+
+📧 Email: devs.randi@gmail.com  
+
+📱 WhatsApp: +62 819-3464-4920 
+
+🔗 GitHub: https://github.com/RepoRandi  
+
+🔗 LinkedIn: https://linkedin.com/in/randi-dev
+
+---
+
+# 🤝 Notes for Reviewer
+
+If you have any questions or would like a walkthrough of the system, feel free to reach out via WhatsApp or email.
+
+I would be happy to explain:
+
+- System architecture
+
+- AI strategy (Gemini + fallback)
+
+- Performance & cost optimization decisions
+
+- Future scalability approach
+
+Thank you for your time and consideration 🙏
