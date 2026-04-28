@@ -115,7 +115,7 @@ To ensure cost efficiency, reliability, and performance, the system implements:
 
 # 🏗 Architecture
 
-Controller    ↓ Service Layer (GeminiService)    ↓ AI / Fallback Generator    ↓ Database (SQLite)    ↓ Blade UI (Preview / Dashboard)
+Controller -> Service Layer (GeminiService) -> AI / Fallback Generator -> Database (SQLite) -> Blade UI (Preview / Dashboard)
 
 ### Components:
 - Controller → Request handling
@@ -194,7 +194,7 @@ Password: password123
 
 # 🧪 Example Flow
 
-User Input    ↓ AI Generation (Gemini)    ↓ Fallback (if failed)    ↓ Save to DB    ↓ Render Preview    ↓ Export HTML
+User Input -> AI Generation (Gemini) -> Fallback (if failed) -> Save to DB -> Render Preview -> Export HTML
 
 ---
 
