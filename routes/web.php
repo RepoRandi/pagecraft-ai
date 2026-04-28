@@ -1,69 +1,47 @@
 <?php
 
-// use App\Http\Controllers\ProfileController;
-// use App\Http\Controllers\SalesPageController;
-// use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SalesPageController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
 
-use Illuminate\Support\Facades\Schema;
-
-Route::get('/debug-db', function () {
-
-    return response()->json([
-
-        'default_connection' => config('database.default'),
-
-        'pgsql_host' => config('database.connections.pgsql.host'),
-
-        'pgsql_port' => config('database.connections.pgsql.port'),
-
-        'database_name' => DB::connection()->getDatabaseName(),
-
-        'driver' => DB::connection()->getDriverName(),
-
-        'tables' => Schema::getTableListing(),
-
-    ]);
+Route::get('/', function () {
+    return Auth::check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
-// Route::get('/', function () {
-//     return Auth::check()
-//         ? redirect()->route('dashboard')
-//         : redirect()->route('login');
-// });
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', [SalesPageController::class, 'index'])
+        ->name('dashboard');
 
-// Route::middleware(['auth', 'verified'])->group(function () {
-//     Route::get('/dashboard', [SalesPageController::class, 'index'])
-//         ->name('dashboard');
+    Route::post('/sales-pages', [SalesPageController::class, 'store'])
+        ->middleware('throttle:10,1440')
+        ->name('sales-pages.store');
 
-//     Route::post('/sales-pages', [SalesPageController::class, 'store'])
-//         ->middleware('throttle:10,1440')
-//         ->name('sales-pages.store');
+    Route::get('/sales-pages/{salesPage}', [SalesPageController::class, 'show'])
+        ->name('sales-pages.show');
 
-//     Route::get('/sales-pages/{salesPage}', [SalesPageController::class, 'show'])
-//         ->name('sales-pages.show');
+    Route::delete('/sales-pages/{salesPage}', [SalesPageController::class, 'destroy'])
+        ->name('sales-pages.destroy');
 
-//     Route::delete('/sales-pages/{salesPage}', [SalesPageController::class, 'destroy'])
-//         ->name('sales-pages.destroy');
+    Route::get('/sales-pages/{salesPage}/export', [SalesPageController::class, 'exportHtml'])
+        ->name('sales-pages.export');
 
-//     Route::get('/sales-pages/{salesPage}/export', [SalesPageController::class, 'exportHtml'])
-//         ->name('sales-pages.export');
+    Route::patch('/sales-pages/{salesPage}/regenerate-section', [SalesPageController::class, 'regenerateSection'])
+        ->middleware('throttle:10,1440')
+        ->name('sales-pages.regenerate-section');
+});
 
-//     Route::patch('/sales-pages/{salesPage}/regenerate-section', [SalesPageController::class, 'regenerateSection'])
-//         ->middleware('throttle:10,1440')
-//         ->name('sales-pages.regenerate-section');
-// });
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
 
-// Route::middleware('auth')->group(function () {
-//     Route::get('/profile', [ProfileController::class, 'edit'])
-//         ->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
 
-//     Route::patch('/profile', [ProfileController::class, 'update'])
-//         ->name('profile.update');
-
-//     Route::delete('/profile', [ProfileController::class, 'destroy'])
-//         ->name('profile.destroy');
-// });
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
+});
 
 require __DIR__ . '/auth.php';
